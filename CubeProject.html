@@ -1,0 +1,425 @@
+<!--- CMSC161 2nd Semester A.Y. 2015-2016 MINI PROJECT -->
+<!--- UV-2L : CANCERAN, Patricia June L. ; PATACSIL, John Philip B. ; RACASA, Loraine --->
+<!--- Reference: http://webglfundamentals.org/webgl/webgl-3d-textures-texture-atlas.html!-->
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<link rel="icon" href="./lib/glass.jpg">
+		<title> PARTY IN THE CLUB </title>
+
+
+		<!-- vertex shader -->
+		<script id="3d-vertex-shader" type="x-shader/x-vertex">
+			attribute vec4 a_position;
+			attribute vec2 a_texcoord;
+
+			uniform mat4 u_matrix;
+
+			varying vec2 v_texcoord;
+			
+		
+
+			void main() {
+			  gl_Position = u_matrix * a_position;
+
+			  v_texcoord = a_texcoord;
+			}
+		</script>
+
+		<!-- fragment shader -->
+		<script id="3d-fragment-shader" type="x-shader/x-fragment">
+			precision mediump float;
+
+			varying vec2 v_texcoord;
+
+			uniform sampler2D u_texture;
+
+			void main() {
+			   gl_FragColor = texture2D(u_texture, v_texcoord);
+			}
+		</script>
+		
+		<!--Import external javascript file-->
+		<!--Helper javascript methods for initializing webgl-->
+		<script src="./lib/jquery-1.7.1.min.js"></script>
+		<script src="./lib/jquery-ui-1.8.16.custom.min.js"></script>
+		<script src="./lib/jquery.gman.ui.js"></script>
+		<script src="./lib/webgl-utils.js"></script>
+		<script src="./lib/webgl-lessons-helper.js"></script>
+		<script src="./lib/webgl-3d-math.js"></script>
+		<script src="//www.kirupa.com/prefixfree.min.js"></script>
+		
+		<script>
+
+		function main() {
+				//Retrieve <canvas> element
+				var canvas = document.getElementById("canvas");
+				if(!canvas) {
+				  console.log("Failed to retrieve the <canvas> element");
+				}
+			
+				var gl = canvas.getContext("webgl");
+				  if (!gl) {
+					return;
+				  }
+
+			//For interacting with the background
+			var clicked = false;
+			var musicOn = document.getElementById("music");
+			var caption = document.getElementById("caption");
+			var audio = document.getElementById("audio");
+			var bg = document.getElementById("background");
+			musicOn.onclick = function(){
+				if(clicked == false){ //Show the cube, and run the music
+				
+				
+				bg.background= "./lib/club.jpg";
+				bg.style.backgroundSize = "cover";
+				setTimeout(function(){
+					bg.background="./lib/clubgif.gif";
+					bg.style.backgroundSize = "cover";
+				},3090);
+				
+				audio.play();
+				requestAnimationFrame(drawScene); //Show the cube
+				caption.textContent = "STOP THE PARTY!";
+				clicked = true;
+				}else{ //Hide the cube, stop the music
+				bg.background="./lib/none.jpg";
+				caption.textContent = "TURN ON THE MUSIC!";
+				clicked = false;
+				audio.pause();
+
+				}
+			}
+
+			  gl.enable(gl.CULL_FACE);
+			  gl.enable(gl.DEPTH_TEST);
+
+			  // setup GLSL program
+			  var program = createProgramFromScripts(gl, ["3d-vertex-shader", "3d-fragment-shader"]);
+			  gl.useProgram(program);
+
+			  // look up where the vertex data needs to go.
+			  var positionLocation = gl.getAttribLocation(program, "a_position");
+			  var texcoordLocation = gl.getAttribLocation(program, "a_texcoord");
+
+			  // lookup uniforms
+			  var matrixLocation = gl.getUniformLocation(program, "u_matrix");
+
+			  // Create a buffer.
+			  var buffer = gl.createBuffer();
+			  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+			  gl.enableVertexAttribArray(positionLocation);
+			  gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+
+			  // Set Geometry.
+			  setGeometry(gl);
+
+			  // Create a buffer for texcoords.
+			  var buffer = gl.createBuffer();
+			  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+			  gl.enableVertexAttribArray(texcoordLocation);
+
+			  // We'll supply texcoords as floats.
+			  gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+			  // Set Texcoords.
+			  setTexcoords(gl);
+
+			  // Create a texture.
+			  var texture = gl.createTexture();
+			  gl.bindTexture(gl.TEXTURE_2D, texture);
+			  // Fill the texture with a 1x1 blue pixel.
+			  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+							new Uint8Array([0, 0, 255, 255]));
+			  // Asynchronously load an image
+			  
+			  var image = new Image();
+			  image.src = "./lib/weird.jpg";
+			  image.addEventListener('load', function() {
+				// Now that the image has loaded make copy it to the texture.
+				gl.bindTexture(gl.TEXTURE_2D, texture);
+				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, image);
+
+				// Check if the image is a power of 2 in both dimensions.
+				if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+				   // Yes, it's a power of 2. Generate mips.
+				   gl.generateMipmap(gl.TEXTURE_2D);
+				} else {
+				   // No, it's not a power of 2. Turn of mips and set wrapping to clamp to edge
+				   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+				   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+				   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+				}
+			  });
+
+			  function isPowerOf2(value) {
+				return (value & (value - 1)) == 0;
+			  }
+
+			  function radToDeg(r) {
+				return r * 180 / Math.PI;
+			  }
+
+			  function degToRad(d) {
+				return d * Math.PI / 180;
+			  }
+
+			  var fieldOfViewRadians = degToRad(60);
+			  var modelXRotationRadians = degToRad(0);
+			  var modelYRotationRadians = degToRad(0);
+
+			  // Get the starting time.
+			  var then = 0;
+
+			  //requestAnimationFrame(drawScene);
+
+			  // Draw the scene.
+			  function drawScene(time) {
+				// convert to seconds
+				time *= 0.001;
+				// Subtract the previous time from the current time
+				var deltaTime = time - then;
+				// Remember the current time for the next frame.
+				then = time;
+
+				// Animate the rotation
+				modelYRotationRadians += -0.7 * deltaTime;
+				modelXRotationRadians += -0.4 * deltaTime;
+
+				// Clear the canvas AND the depth buffer.
+				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+				// Compute the projection matrix
+				var aspect = canvas.clientWidth / canvas.clientHeight;
+				var zNear  = 1;
+				var zFar   = 2000;
+				var projectionMatrix =
+					makePerspective(fieldOfViewRadians, aspect, zNear, zFar);
+
+				if(clicked == true){
+					var cameraPosition = [0, 0, 4];
+					var up = [0, 1, 0];
+					var target = [0, 0, 0];
+				}else{
+					var cameraPosition = [0, 0, 0];
+					var up = [0, 1, 0];
+					var target = [0, 0, 0];
+				}
+
+				// Compute the camera's matrix using look at.
+				var cameraMatrix = makeLookAt(cameraPosition, target, up);
+
+				// Make a view matrix from the camera matrix.
+				var viewMatrix = makeInverse(cameraMatrix);
+
+				var translationMatrix = makeTranslation(0, 0, 0);
+				var xRotationMatrix = makeXRotation(modelXRotationRadians);
+				var yRotationMatrix = makeYRotation(modelYRotationRadians);
+
+				// Multiply the matrices.
+				var matrix = yRotationMatrix;
+				matrix = matrixMultiply(matrix, xRotationMatrix);
+				matrix = matrixMultiply(matrix, translationMatrix);
+				matrix = matrixMultiply(matrix, viewMatrix);
+				matrix = matrixMultiply(matrix, projectionMatrix);
+
+				// Set the matrix.
+				gl.uniformMatrix4fv(matrixLocation, false, matrix);
+
+				// Draw the geometry.
+				gl.drawArrays(gl.TRIANGLES, 0, 6 * 6);
+
+				requestAnimationFrame(drawScene);
+			  }
+			}
+
+			// Fill the buffer with the values that define a cube.
+			function setGeometry(gl) {
+			  var positions = new Float32Array(
+				[
+				-0.5, -0.5,  -0.5,
+				-0.5,  0.5,  -0.5,
+				 0.5, -0.5,  -0.5,
+				-0.5,  0.5,  -0.5,
+				 0.5,  0.5,  -0.5,
+				 0.5, -0.5,  -0.5,
+
+				-0.5, -0.5,   0.5,
+				 0.5, -0.5,   0.5,
+				-0.5,  0.5,   0.5,
+				-0.5,  0.5,   0.5,
+				 0.5, -0.5,   0.5,
+				 0.5,  0.5,   0.5,
+
+				-0.5,   0.5, -0.5,
+				-0.5,   0.5,  0.5,
+				 0.5,   0.5, -0.5,
+				-0.5,   0.5,  0.5,
+				 0.5,   0.5,  0.5,
+				 0.5,   0.5, -0.5,
+
+				-0.5,  -0.5, -0.5,
+				 0.5,  -0.5, -0.5,
+				-0.5,  -0.5,  0.5,
+				-0.5,  -0.5,  0.5,
+				 0.5,  -0.5, -0.5,
+				 0.5,  -0.5,  0.5,
+
+				-0.5,  -0.5, -0.5,
+				-0.5,  -0.5,  0.5,
+				-0.5,   0.5, -0.5,
+				-0.5,  -0.5,  0.5,
+				-0.5,   0.5,  0.5,
+				-0.5,   0.5, -0.5,
+
+				 0.5,  -0.5, -0.5,
+				 0.5,   0.5, -0.5,
+				 0.5,  -0.5,  0.5,
+				 0.5,  -0.5,  0.5,
+				 0.5,   0.5, -0.5,
+				 0.5,   0.5,  0.5,
+
+				]);
+			  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+			}
+
+			// Fill the buffer with texture coordinates the cube.
+			function setTexcoords(gl) {
+			  gl.bufferData(
+				  gl.ARRAY_BUFFER,
+				  new Float32Array(
+					[
+					// select the bottom left image
+					0   , 0  ,
+					0   , 0.5,
+					0.25, 0  ,
+					0   , 0.5,
+					0.25, 0.5,
+					0.25, 0  ,
+					// select the bottom middle image
+					0.25, 0  ,
+					0.5 , 0  ,
+					0.25, 0.5,
+					0.25, 0.5,
+					0.5 , 0  ,
+					0.5 , 0.5,
+					// select to bottom right image
+					0.5 , 0  ,
+					0.5 , 0.5,
+					0.75, 0  ,
+					0.5 , 0.5,
+					0.75, 0.5,
+					0.75, 0  ,
+					// select the top left image
+					0   , 0.5,
+					0.25, 0.5,
+					0   , 1  ,
+					0   , 1  ,
+					0.25, 0.5,
+					0.25, 1  ,
+					// select the top middle image
+					0.25, 0.5,
+					0.25, 1  ,
+					0.5 , 0.5,
+					0.25, 1  ,
+					0.5 , 1  ,
+					0.5 , 0.5,
+					// select the top right image
+					0.5 , 0.5,
+					0.75, 0.5,
+					0.5 , 1  ,
+					0.5 , 1  ,
+					0.75, 0.5,
+					0.75, 1  ,
+
+				  ]),
+				  gl.STATIC_DRAW);
+			}
+
+		</script>
+
+	<style>
+
+	#music{
+		background-color: yellow;
+		height: 100px;
+		width: 200px;
+		font-family: Georgia;
+		font-size: 24px;
+	}
+
+	#contentContainer {
+	    overflow: hidden;
+	    cursor: pointer;
+	}
+
+	#canvas {
+	    position: relative;
+	    left: 460px;
+	    top: 50px;
+	    transition: left .5s ease-in, top .5s ease-in;
+	}
+	</style>
+		
+	</head>
+	<body id="background" onload="main()" background="./lib/none.jpg">
+		<div id="contentContainer">
+			<canvas id="canvas" width="400" height="400"></canvas>
+		</div>
+		<br>
+		<CENTER><button id="music">
+			<p id="caption">TURN ON THE MUSIC!</p>
+		</button></CENTER>
+		<audio id="audio" src="./lib/bgMusic.mp3" ></audio>
+	</body>
+</html>
+
+<script>
+	var theThing = document.querySelector("#canvas");
+	var container = document.querySelector("#contentContainer");
+			 
+	container.addEventListener("click", getClickPosition, false);
+			 
+	function getClickPosition(e) {
+		var parentPosition = getPosition(e.currentTarget);
+		var xPosition = e.clientX - parentPosition.x - (theThing.clientWidth / 2);
+		var yPosition = e.clientY - parentPosition.y - (theThing.clientHeight / 2);
+			     
+		theThing.style.left = xPosition + "px";
+		theThing.style.top = yPosition + "px";
+	}
+			 
+	// Helper function to get an element's exact position
+	function getPosition(el) {
+		var xPos = 0;
+		var yPos = 0;
+			 
+		while (el) {
+			if (el.tagName == "BODY") {
+			// deal with browser quirks with body/window/document and page scroll
+				var xScroll = el.scrollLeft || document.documentElement.scrollLeft;
+				var yScroll = el.scrollTop || document.documentElement.scrollTop;
+			 
+				xPos += (el.offsetLeft - xScroll + el.clientLeft);
+				yPos += (el.offsetTop - yScroll + el.clientTop);
+			    } else {
+			      // for all other non-BODY elements
+				xPos += (el.offsetLeft - el.scrollLeft + el.clientLeft);
+				yPos += (el.offsetTop - el.scrollTop + el.clientTop);
+			    }
+			 
+			    el = el.offsetParent;
+			  }
+			  return {
+			    x: xPos,
+			    y: yPos
+			  };
+			}
+</script>
+
+
+
+
